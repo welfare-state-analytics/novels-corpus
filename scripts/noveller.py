@@ -13,7 +13,7 @@ blm={"label": "BONNIERS", "tags": "issue"}
 afton={"tags": "issue"}
 
 
-def get_content(filter=afton,max_number=1):
+def get_content(filter=romaner,max_number=1):
     """API call to obtain a list of all books from kblab. 
     Args:
         filter (dictionary): A dictionary containing the filters for the packages in the betalab query.
@@ -23,27 +23,28 @@ def get_content(filter=afton,max_number=1):
         books (list): a list containing a list of responses from requests.get, containing alto-xml files.
     """
 
-    with open('/Users/liamtabibzadeh/Documents/Westac/API_credentials.txt', 'r') as file:
+    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
         pw = file.read().replace('\n', '')
 
-    a = Archive("https://betalab.kb.se", auth=("demo", pw))
+    a = Archive("https://datalab.kb.se", auth=("demo", pw))
     books=[]
     xmlns='http://www.loc.gov/standards/alto/ns-v2#'
     for package_id in a.search(filter, max=max_number):
         book=[]
         page_index=1
+        image_links=[]
         for x in a.get(package_id):
             if "jp" in x:
-                image_link=f"https://betalab.kb.se/{package_id}/{x}/_view"
+                image_links.append(f"https://datalab.kb.se/{package_id}/{x}/_view")
             if "xml" in x:
+                print(image_links[page_index-1])
                 for i in range(5):
                     backoff_time = 0.1 * (2 ** i)
-                    page=requests.get(f"https://betalab.kb.se/{package_id}/{x}", auth=HTTPBasicAuth("demo", pw),stream=True)
+                    page=requests.get(f"https://datalab.kb.se/{package_id}/{x}", auth=HTTPBasicAuth("demo", pw),stream=True)
                     if page.status_code == 200:
                         tree= ET.ElementTree(ET.fromstring(page.text))
                         """ Extract text content from ALTO xml file """
-                        content_in_page=f"<pb n='{page_index}' facs ='{image_link}'/>" 
-                        
+                        content_in_page=f"<pb n='{page_index}' facs ='{image_links[page_index-1]}'/>" 
                         # Find all <TextLine> elements
                         for lines in tree.iterfind('.//{%s}TextLine' % xmlns):
                             # New line after every <TextLine> element
@@ -68,21 +69,22 @@ def get_content(filter=afton,max_number=1):
                         page_index+=1
                         break
                     else:
-                        print(f"https://betalab.kb.se/{package_id}/{x} failed")
+                        print(f"https://datalab.kb.se/{package_id}/{x} failed")
                         time.sleep(backoff_time)
 
         books.append(book)
     return books
-    
 
-def get_ids(filter=afton,max_number=1):
+
+
+def get_ids(filter=romaner,max_number=1):
     """function to return all ids
     """
 
-    with open('/Users/liamtabibzadeh/Documents/Westac/API_credentials.txt', 'r') as file:
+    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
         pw = file.read().replace('\n', '')
 
-    a = Archive("https://betalab.kb.se", auth=("demo", pw))
+    a = Archive("https://datalab.kb.se", auth=("demo", pw))
     ids=[]
     for package_id in a.search(filter, max=max_number):
         ids.append(package_id)
