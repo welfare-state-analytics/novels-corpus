@@ -1,10 +1,11 @@
-import kblab
 from kblab import Archive
 import requests
 from requests.auth import HTTPBasicAuth
 import xml.etree.ElementTree as ET
 import time
-import os
+from pathlib import Path
+import zipfile
+from ebooklib import epub
 import zipfile
 
 romaner={"meta.host_title": "Welfare state analytics"}
@@ -12,7 +13,7 @@ blm={"label": "BONNIERS", "tags": "issue"}
 afton={"tags": "issue"}
 
 
-def get_content(filter=romaner,max_number=3700):
+def get_content(filter=afton,max_number=1):
     """API call to obtain a list of all books from kblab. 
     Args:
         filter (dictionary): A dictionary containing the filters for the packages in the betalab query.
@@ -22,7 +23,7 @@ def get_content(filter=romaner,max_number=3700):
         books (list): a list containing a list of responses from requests.get, containing alto-xml files.
     """
 
-    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
+    with open('/Users/liamtabibzadeh/Documents/Westac/API_credentials.txt', 'r') as file:
         pw = file.read().replace('\n', '')
 
     a = Archive("https://betalab.kb.se", auth=("demo", pw))
@@ -68,17 +69,17 @@ def get_content(filter=romaner,max_number=3700):
                         break
                     else:
                         print(f"https://betalab.kb.se/{package_id}/{x} failed")
-                    time.sleep(backoff_time)
+                        time.sleep(backoff_time)
 
         books.append(book)
     return books
     
 
-def get_ids(filter=afton,max_number=3700):
+def get_ids(filter=afton,max_number=1):
     """function to return all ids
     """
 
-    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
+    with open('/Users/liamtabibzadeh/Documents/Westac/API_credentials.txt', 'r') as file:
         pw = file.read().replace('\n', '')
 
     a = Archive("https://betalab.kb.se", auth=("demo", pw))
@@ -87,8 +88,7 @@ def get_ids(filter=afton,max_number=3700):
         ids.append(package_id)
     return ids
 
-from ebooklib import epub
-import zipfile
+
 if __name__ == "__main__":
     for content,id in zip(get_content(),get_ids()):
         book = epub.EpubBook()
@@ -131,9 +131,9 @@ if __name__ == "__main__":
         # write to the file
         epub.write_epub(f"{id}.epub", book)
         newpath = f"book unzipped/{id}" 
-        if not os.path.exists(newpath):
-            os.makedirs(newpath)
+        Path(newpath).mkdir(parents=True, exist_ok=True)
+
 
         with zipfile.ZipFile(f"{id}.epub", 'r') as zip_ref:
             zip_ref.extractall(newpath)
-        os.remove(f"{id}.epub") #delete epub
+        Path(f"{id}.epub").unlink()
