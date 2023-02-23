@@ -7,10 +7,11 @@ from pathlib import Path
 import zipfile
 from ebooklib import epub
 import zipfile
+from lxml import etree
 
-romaner={"meta.host_title": "Welfare state analytics"}
-blm={"label": "BONNIERS", "tags": "issue"}
-afton={"tags": "issue"}
+romaner=[{"meta.host_title": "Welfare state analytics"},"https://datalab.kb.se"]
+blm=[{"label": "BONNIERS", "tags": "issue"},"https://datalab.kb.se"]
+dn=[{"tags": "issue"},"https://betalab.kb.se"]
 
 
 def get_content(filter=romaner,max_number=1):
@@ -22,29 +23,31 @@ def get_content(filter=romaner,max_number=1):
     Returns:
         books (list): a list containing a list of responses from requests.get, containing alto-xml files.
     """
-
-    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
+    home_dir=str(Path.home())
+    with open(f'{home_dir}/Path/to/API_credentials', 'r') as file:
         pw = file.read().replace('\n', '')
 
-    a = Archive("https://datalab.kb.se", auth=("demo", pw))
+    a = Archive(filter[1], auth=("demo", pw))
     books=[]
     xmlns='http://www.loc.gov/standards/alto/ns-v2#'
-    for package_id in a.search(filter, max=max_number):
-        book=[]
+    for package_id in a.search(filter[0], max=max_number):
+        write_root=etree.Element(package_id)
         page_index=1
         image_links=[]
         for x in a.get(package_id):
             if "jp" in x:
-                image_links.append(f"https://datalab.kb.se/{package_id}/{x}/_view")
+                image_links.append(f"{filter[1]}/{package_id}/{x}/_view")
             if "xml" in x:
-                print(image_links[page_index-1])
                 for i in range(5):
                     backoff_time = 0.1 * (2 ** i)
-                    page=requests.get(f"https://datalab.kb.se/{package_id}/{x}", auth=HTTPBasicAuth("demo", pw),stream=True)
+                    page=requests.get(f"{filter[1]}/{package_id}/{x}", auth=HTTPBasicAuth("demo", pw),stream=True)
                     if page.status_code == 200:
                         tree= ET.ElementTree(ET.fromstring(page.text))
                         """ Extract text content from ALTO xml file """
-                        content_in_page=f"<pb n='{page_index}' facs ='{image_links[page_index-1]}'/>" 
+                        pb=etree.SubElement(write_root, "pb")
+                        pb.set("n",f"{page_index}")
+                        pb.set("facs",f"{image_links[page_index-1]}")
+                        #contentinpage set here
                         # Find all <TextLine> elements
                         for lines in tree.iterfind('.//{%s}TextLine' % xmlns):
                             # New line after every <TextLine> element
@@ -64,15 +67,15 @@ def get_content(filter=romaner,max_number=1):
                                 if "<" in block or ">" in block:
                                     block=block.replace("<","")
                                     block=block.replace(">","")
-                                content_in_page+=(f"<p>{block}</p>")
-                        book.append(content_in_page)
+                                content_in_page=etree.SubElement(write_root, "p")
+                                content_in_page.text=block
                         page_index+=1
                         break
                     else:
-                        print(f"https://datalab.kb.se/{package_id}/{x} failed")
+                        print(f"{filter[1]}/{package_id}/{x} failed")
                         time.sleep(backoff_time)
 
-        books.append(book)
+        books.append(etree.tostring(write_root, pretty_print=True))
     return books
 
 
@@ -80,13 +83,13 @@ def get_content(filter=romaner,max_number=1):
 def get_ids(filter=romaner,max_number=1):
     """function to return all ids
     """
-
-    with open('/home/liamtabibzadeh/Documents/API_credentials.txt', 'r') as file:
+    home_dir=str(Path.home())
+    with open(f'{home_dir}/Path/to/API_credentials', 'r') as file:
         pw = file.read().replace('\n', '')
 
-    a = Archive("https://datalab.kb.se", auth=("demo", pw))
+    a = Archive(filter[1], auth=("demo", pw))
     ids=[]
-    for package_id in a.search(filter, max=max_number):
+    for package_id in a.search(filter[0], max=max_number):
         ids.append(package_id)
     return ids
 
@@ -96,19 +99,18 @@ if __name__ == "__main__":
         book = epub.EpubBook()
 
         # set metadata
-        from ebooklib import epub
 
         book = epub.EpubBook()
 
         # set metadata
-        book.set_identifier(f"{id}")
+        book.set_identifier(id)
         book.set_title("Sample book")
         book.set_language("sv")
 
 
         # create content in one chapter
-        c1 = epub.EpubHtml(title="Intro", file_name="chap_01.xhtml", lang="hr")
-        c1.content = (" ".join(content))
+        c1 = epub.EpubHtml(title=id, file_name="content.xhtml", lang="sv")
+        c1.content = content
         book.add_item(c1)
 
         # add default NCX and Nav file
